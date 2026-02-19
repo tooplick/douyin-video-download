@@ -1,153 +1,162 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>抖音视频下载 - 免费无水印下载</title>
-  <meta name="description" content="免费在线抖音视频下载工具，支持无水印下载、多画质选择、视频预览">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>抖音视频下载 - 免费无水印下载</title>
+    <meta name="description" content="免费在线抖音视频下载工具，支持无水印下载、多画质选择、视频预览">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/style.css">
 </head>
+
 <body>
-  <div class="app">
-    <!-- Header -->
-    <header class="header">
-      <div class="header-content">
-        <div class="logo">
-          <svg class="logo-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M34 8h-4a10 10 0 0 0 10 10v4a14 14 0 0 1-10-4v14a10 10 0 1 1-10-10v4a6 6 0 1 0 6 6V8h8z" fill="url(#g)"/>
-            <defs><linearGradient id="g" x1="14" y1="8" x2="40" y2="42"><stop stop-color="#FE2C55"/><stop offset="1" stop-color="#25F4EE"/></linearGradient></defs>
-          </svg>
-          <h1>抖音视频下载</h1>
-        </div>
-        <p class="subtitle">免费 · 无水印 · 多画质 · 在线预览</p>
-      </div>
-    </header>
-
-    <!-- Input Section -->
-    <main class="main">
-      <section class="input-section">
-        <div class="input-wrapper">
-          <input
-            type="text"
-            id="urlInput"
-            class="url-input"
-            placeholder="粘贴抖音分享链接或视频链接..."
-            autocomplete="off"
-          >
-          <button id="parseBtn" class="parse-btn" onclick="parseVideo()">
-            <span class="btn-text">解析</span>
-            <span class="btn-loader" style="display:none"></span>
-          </button>
-        </div>
-        <p class="input-hint">支持：抖音分享链接、视频页面链接、短链接等</p>
-      </section>
-
-      <!-- Error Message -->
-      <div id="errorMsg" class="error-msg" style="display:none"></div>
-
-      <!-- Result Section -->
-      <section id="resultSection" class="result-section" style="display:none">
-        <!-- Video Mode -->
-        <div id="videoResult" style="display:none">
-          <div class="result-grid">
-            <!-- Video Preview -->
-            <div class="preview-card">
-              <div class="video-container">
-                <video
-                  id="videoPlayer"
-                  controls
-                  playsinline
-                  preload="metadata"
-                  poster=""
-                >
-                  你的浏览器不支持视频播放
-                </video>
-              </div>
-            </div>
-
-            <!-- Video Info -->
-            <div class="info-card">
-              <div class="author-row">
-                <img id="authorAvatar" class="author-avatar" src="" alt="">
-                <div class="author-info">
-                  <span id="authorName" class="author-name"></span>
-                  <span id="videoDuration" class="video-duration"></span>
+    <div class="app">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <svg class="logo-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path
+                            d="M34 8h-4a10 10 0 0 0 10 10v4a14 14 0 0 1-10-4v14a10 10 0 1 1-10-10v4a6 6 0 1 0 6 6V8h8z"
+                            fill="url(#g)" />
+                        <defs>
+                            <linearGradient id="g" x1="14" y1="8" x2="40" y2="42">
+                                <stop stop-color="#FE2C55" />
+                                <stop offset="1" stop-color="#25F4EE" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <h1>抖音视频下载</h1>
                 </div>
-              </div>
-
-              <h2 id="videoTitle" class="video-title"></h2>
-
-              <div class="stats-row">
-                <span class="stat-item" id="statDigg">
-                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-                  <span></span>
-                </span>
-                <span class="stat-item" id="statComment">
-                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10z"/></svg>
-                  <span></span>
-                </span>
-                <span class="stat-item" id="statCollect">
-                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>
-                  <span></span>
-                </span>
-                <span class="stat-item" id="statShare">
-                  <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 16c-.8 0-1.4.35-2 .9l-7-4.15c.05-.25.1-.5.1-.75s-.05-.5-.1-.75L16 7.1c.55.55 1.2.9 2 .9 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .25.05.5.1.75L8 9.85C7.45 9.3 6.8 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.8 0 1.45-.3 2-.85l7.1 4.15c-.05.2-.1.45-.1.7 0 1.66 1.34 3 3 3s3-1.34 3-3-1.34-3-3-3z"/></svg>
-                  <span></span>
-                </span>
-              </div>
-
-              <!-- Quality Selector -->
-              <div class="quality-section">
-                <h3 class="section-label">选择画质</h3>
-                <div id="qualityList" class="quality-list"></div>
-              </div>
-
-              <!-- Download Button -->
-              <button id="downloadBtn" class="download-btn" onclick="downloadVideo()">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="7 10 12 15 17 10"/>
-                  <line x1="12" y1="15" x2="12" y2="3"/>
-                </svg>
-                <span>下载视频</span>
-              </button>
+                <p class="subtitle">免费 · 无水印 · 多画质 · 在线预览</p>
             </div>
-          </div>
-        </div>
+        </header>
 
-        <!-- Image Mode -->
-        <div id="imageResult" style="display:none">
-          <div class="image-header">
-            <div class="author-row">
-              <img id="imgAuthorAvatar" class="author-avatar" src="" alt="">
-              <div class="author-info">
-                <span id="imgAuthorName" class="author-name"></span>
-              </div>
-            </div>
-            <h2 id="imgTitle" class="video-title"></h2>
-          </div>
-          <div id="imageGallery" class="image-gallery"></div>
-          <button class="download-btn download-all-btn" onclick="downloadAllImages()">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="7 10 12 15 17 10"/>
-              <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            <span>下载全部图片</span>
-          </button>
-        </div>
-      </section>
-    </main>
+        <!-- Input Section -->
+        <main class="main">
+            <section class="input-section">
+                <div class="input-wrapper">
+                    <input type="text" id="urlInput" class="url-input" placeholder="粘贴抖音分享链接或视频链接..."
+                        autocomplete="off">
+                    <button id="parseBtn" class="parse-btn" onclick="parseVideo()">
+                        <span class="btn-text">解析</span>
+                        <span class="btn-loader" style="display:none"></span>
+                    </button>
+                </div>
+                <p class="input-hint">支持：抖音分享链接、视频页面链接、短链接等</p>
+            </section>
 
-    <!-- Footer -->
-    <footer class="footer">
-      <p>基于 <a href="https://github.com/Evil0ctal/Douyin_TikTok_Download_API" target="_blank">Douyin_TikTok_Download_API</a> · 部署于 Cloudflare Pages</p>
-    </footer>
-  </div>
+            <!-- Error Message -->
+            <div id="errorMsg" class="error-msg" style="display:none"></div>
 
-  <script src="/script.js"></script>
+            <!-- Result Section -->
+            <section id="resultSection" class="result-section" style="display:none">
+                <!-- Video Mode -->
+                <div id="videoResult" style="display:none">
+                    <div class="result-grid">
+                        <!-- Video Preview -->
+                        <div class="preview-card">
+                            <div class="video-container">
+                                <video id="videoPlayer" controls playsinline preload="metadata" poster="">
+                                    你的浏览器不支持视频播放
+                                </video>
+                            </div>
+                        </div>
+
+                        <!-- Video Info -->
+                        <div class="info-card">
+                            <div class="author-row">
+                                <img id="authorAvatar" class="author-avatar" src="" alt="">
+                                <div class="author-info">
+                                    <span id="authorName" class="author-name"></span>
+                                    <span id="videoDuration" class="video-duration"></span>
+                                </div>
+                            </div>
+
+                            <h2 id="videoTitle" class="video-title"></h2>
+
+                            <div class="stats-row">
+                                <span class="stat-item" id="statDigg">
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        <path
+                                            d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                                    </svg>
+                                    <span></span>
+                                </span>
+                                <span class="stat-item" id="statComment">
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10z" />
+                                    </svg>
+                                    <span></span>
+                                </span>
+                                <span class="stat-item" id="statCollect">
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z" />
+                                    </svg>
+                                    <span></span>
+                                </span>
+                                <span class="stat-item" id="statShare">
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        <path
+                                            d="M18 16c-.8 0-1.4.35-2 .9l-7-4.15c.05-.25.1-.5.1-.75s-.05-.5-.1-.75L16 7.1c.55.55 1.2.9 2 .9 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .25.05.5.1.75L8 9.85C7.45 9.3 6.8 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.8 0 1.45-.3 2-.85l7.1 4.15c-.05.2-.1.45-.1.7 0 1.66 1.34 3 3 3s3-1.34 3-3-1.34-3-3-3z" />
+                                    </svg>
+                                    <span></span>
+                                </span>
+                            </div>
+
+                            <!-- Quality Selector -->
+                            <div class="quality-section">
+                                <h3 class="section-label">选择画质</h3>
+                                <div id="qualityList" class="quality-list"></div>
+                            </div>
+
+                            <!-- Download Button -->
+                            <button id="downloadBtn" class="download-btn" onclick="downloadVideo()">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                    <polyline points="7 10 12 15 17 10" />
+                                    <line x1="12" y1="15" x2="12" y2="3" />
+                                </svg>
+                                <span>下载视频</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Image Mode -->
+                <div id="imageResult" style="display:none">
+                    <div class="image-header">
+                        <div class="author-row">
+                            <img id="imgAuthorAvatar" class="author-avatar" src="" alt="">
+                            <div class="author-info">
+                                <span id="imgAuthorName" class="author-name"></span>
+                            </div>
+                        </div>
+                        <h2 id="imgTitle" class="video-title"></h2>
+                    </div>
+                    <div id="imageGallery" class="image-gallery"></div>
+                    <button class="download-btn download-all-btn" onclick="downloadAllImages()">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="7 10 12 15 17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
+                        </svg>
+                        <span>下载全部图片</span>
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Cloudflare Pages</p>
+        </footer>
+    </div>
+
+    <script src="/script.js"></script>
 </body>
+
 </html>

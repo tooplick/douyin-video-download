@@ -15,7 +15,6 @@
 
 - **前端**: HTML + CSS + JavaScript（原生，无框架）
 - **后端**: Cloudflare Pages Functions
-- **签名算法**: SM3 哈希 + ABogus（从 [Douyin_TikTok_Download_API](https://github.com/Evil0ctal/Douyin_TikTok_Download_API) 移植）
 
 ## 📁 目录结构
 

@@ -1,6 +1,6 @@
 # 抖音视频下载
 
-免费在线抖音视频下载工具，部署在 Cloudflare Pages 上。
+免费在线抖音视频下载工具，部署在 Cloudflare Pages 上。**完全自建 API，不依赖任何外部服务。**
 
 ## ✨ 功能
 
@@ -9,12 +9,31 @@
 - 📊 多画质选择（4K / 1440p / 1080p / 720p / 540p）
 - 🖼️ 图集作品支持（预览 + 批量下载）
 - 📱 响应式设计，适配移动端
+- 🔐 自建 ABogus 签名，无需第三方 API
 
 ## 🛠️ 技术栈
 
 - **前端**: HTML + CSS + JavaScript（原生，无框架）
 - **后端**: Cloudflare Pages Functions
-- **API**: [Douyin_TikTok_Download_API](https://github.com/Evil0ctal/Douyin_TikTok_Download_API)
+- **签名算法**: SM3 哈希 + ABogus（从 [Douyin_TikTok_Download_API](https://github.com/Evil0ctal/Douyin_TikTok_Download_API) 移植）
+
+## 📁 目录结构
+
+```
+├── index.html              # 主页面
+├── style.css               # 样式
+├── script.js               # 前端逻辑
+├── _headers                # 自定义 Headers
+├── functions/
+│   ├── api/
+│   │   ├── parse.js        # 解析链接 API（调用本地模块）
+│   │   └── download.js     # 代理下载 API
+│   └── lib/
+│       ├── sm3.js          # SM3 国密哈希算法
+│       ├── abogus.js       # ABogus 签名算法
+│       └── douyin.js       # 抖音 API 交互（ID提取 + 数据获取）
+└── README.md
+```
 
 ## 📦 部署
 
@@ -26,7 +45,12 @@
 4. 构建设置：
    - **构建命令**: 留空
    - **构建输出目录**: `/`
-5. 部署完成
+5. 设置环境变量：
+   - **变量名**: `DOUYIN_COOKIE`
+   - **值**: 从浏览器登录抖音后复制 Cookie
+6. 部署完成
+
+> ⚠️ Cookie 会过期，需定期在 Pages 设置中更新 `DOUYIN_COOKIE` 环境变量。
 
 ### 本地开发
 
@@ -34,27 +58,16 @@
 # 安装 wrangler
 npm install -g wrangler
 
+# 创建 .dev.vars 文件配置 Cookie
+echo "DOUYIN_COOKIE=你的抖音Cookie" > .dev.vars
+
 # 启动本地开发服务器
 npx wrangler pages dev .
 ```
 
-## 📁 目录结构
-
-```
-├── index.html        # 主页面
-├── style.css         # 样式
-├── script.js         # 前端逻辑
-├── functions/
-│   └── api/
-│       ├── parse.js      # 解析链接 API
-│       └── download.js   # 代理下载 API
-├── _headers          # 自定义 Headers
-└── README.md
-```
-
 ## 🙏 致谢
 
-本项目基于 [Douyin_TikTok_Download_API](https://github.com/Evil0ctal/Douyin_TikTok_Download_API)
+签名算法移植自 [Douyin_TikTok_Download_API](https://github.com/Evil0ctal/Douyin_TikTok_Download_API)
 
 ## ⚠️ 免责声明
 

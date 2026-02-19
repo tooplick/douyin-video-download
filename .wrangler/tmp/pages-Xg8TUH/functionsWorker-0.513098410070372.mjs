@@ -49,8 +49,405 @@ async function onRequestGet(context) {
 }
 __name(onRequestGet, "onRequestGet");
 
+// lib/sm3.js
+var T = [];
+for (let i = 0; i < 16; i++) T[i] = 2043430169;
+for (let i = 16; i < 64; i++) T[i] = 2055708042;
+function leftRotate(x, n) {
+  n %= 32;
+  return (x << n | x >>> 32 - n) >>> 0;
+}
+__name(leftRotate, "leftRotate");
+function FF(x, y, z, j) {
+  if (j < 16) return (x ^ y ^ z) >>> 0;
+  return (x & y | x & z | y & z) >>> 0;
+}
+__name(FF, "FF");
+function GG(x, y, z, j) {
+  if (j < 16) return (x ^ y ^ z) >>> 0;
+  return (x & y | ~x & z) >>> 0;
+}
+__name(GG, "GG");
+function P0(x) {
+  return (x ^ leftRotate(x, 9) ^ leftRotate(x, 17)) >>> 0;
+}
+__name(P0, "P0");
+function P1(x) {
+  return (x ^ leftRotate(x, 15) ^ leftRotate(x, 23)) >>> 0;
+}
+__name(P1, "P1");
+function paddingMsg(msg) {
+  const len = msg.length;
+  const bitLen = len * 8;
+  msg.push(128);
+  while (msg.length % 64 !== 56) msg.push(0);
+  const hi = Math.floor(bitLen / 4294967296) >>> 0;
+  const lo = (bitLen & 4294967295) >>> 0;
+  for (let i = 3; i >= 0; i--) msg.push(hi >>> i * 8 & 255);
+  for (let i = 3; i >= 0; i--) msg.push(lo >>> i * 8 & 255);
+  return msg;
+}
+__name(paddingMsg, "paddingMsg");
+function sm3Hash(inputBytes) {
+  const msg = paddingMsg([...inputBytes]);
+  let V = [
+    1937774191,
+    1226093241,
+    388252375,
+    3666478592,
+    2842636476,
+    372324522,
+    3817729613,
+    2969243214
+  ];
+  const blocks = msg.length / 64;
+  for (let b = 0; b < blocks; b++) {
+    const offset = b * 64;
+    const W = new Array(68);
+    const W1 = new Array(64);
+    for (let i = 0; i < 16; i++) {
+      W[i] = (msg[offset + i * 4] << 24 | msg[offset + i * 4 + 1] << 16 | msg[offset + i * 4 + 2] << 8 | msg[offset + i * 4 + 3]) >>> 0;
+    }
+    for (let i = 16; i < 68; i++) {
+      W[i] = (P1(W[i - 16] ^ W[i - 9] ^ leftRotate(W[i - 3], 15)) ^ leftRotate(W[i - 13], 7) ^ W[i - 6]) >>> 0;
+    }
+    for (let i = 0; i < 64; i++) {
+      W1[i] = (W[i] ^ W[i + 4]) >>> 0;
+    }
+    let [A, B, C, D, E, F, G, H] = V;
+    for (let j = 0; j < 64; j++) {
+      const SS1 = leftRotate(leftRotate(A, 12) + E + leftRotate(T[j], j) >>> 0, 7);
+      const SS2 = (SS1 ^ leftRotate(A, 12)) >>> 0;
+      const TT1 = FF(A, B, C, j) + D + SS2 + W1[j] >>> 0;
+      const TT2 = GG(E, F, G, j) + H + SS1 + W[j] >>> 0;
+      D = C;
+      C = leftRotate(B, 9);
+      B = A;
+      A = TT1;
+      H = G;
+      G = leftRotate(F, 19);
+      F = E;
+      E = P0(TT2);
+    }
+    V[0] = (V[0] ^ A) >>> 0;
+    V[1] = (V[1] ^ B) >>> 0;
+    V[2] = (V[2] ^ C) >>> 0;
+    V[3] = (V[3] ^ D) >>> 0;
+    V[4] = (V[4] ^ E) >>> 0;
+    V[5] = (V[5] ^ F) >>> 0;
+    V[6] = (V[6] ^ G) >>> 0;
+    V[7] = (V[7] ^ H) >>> 0;
+  }
+  const result = [];
+  for (let i = 0; i < 8; i++) {
+    result.push(V[i] >>> 24 & 255, V[i] >>> 16 & 255, V[i] >>> 8 & 255, V[i] & 255);
+  }
+  return result;
+}
+__name(sm3Hash, "sm3Hash");
+function sm3ToArray(data) {
+  let bytes;
+  if (typeof data === "string") {
+    bytes = Array.from(new TextEncoder().encode(data));
+  } else {
+    bytes = Array.from(data);
+  }
+  return sm3Hash(bytes);
+}
+__name(sm3ToArray, "sm3ToArray");
+
+// lib/abogus.js
+var STR_MAP = {
+  s0: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=",
+  s1: "Dkdpgh4ZKsQB80/Mfvw36XI1R25+WUAlEi7NLboqYTOPuzmFjJnryx9HVGcaStCe=",
+  s2: "Dkdpgh4ZKsQB80/Mfvw36XI1R25-WUAlEi7NLboqYTOPuzmFjJnryx9HVGcaStCe=",
+  s3: "ckdp1h4ZKsUB80/Mfvw36XIgR25+WQAlEi7NLboqYTOPuzKFjJnry79HbGcaStCe",
+  s4: "Dkdpgh2ZmsQB80/MfvV36XI1R45-WUAlEixNLwoqYTOPuzKFjJnry79HbGcaStCe"
+};
+var END_STRING = "cus";
+var BROWSER = "1536|742|1536|864|0|0|0|0|1536|864|1536|864|1536|742|24|24|MacIntel";
+var UA_CODE = [
+  76,
+  98,
+  15,
+  131,
+  97,
+  245,
+  224,
+  133,
+  122,
+  199,
+  241,
+  166,
+  79,
+  34,
+  90,
+  191,
+  128,
+  126,
+  122,
+  98,
+  66,
+  11,
+  14,
+  40,
+  49,
+  110,
+  110,
+  173,
+  67,
+  96,
+  138,
+  252
+];
+function charCodeAt(s) {
+  return Array.from(s).map((c) => c.charCodeAt(0));
+}
+__name(charCodeAt, "charCodeAt");
+function fromCharCode(...args) {
+  return args.map((c) => String.fromCharCode(c)).join("");
+}
+__name(fromCharCode, "fromCharCode");
+function randomList(a, b = 170, c = 85, d = 0, e = 0, f = 0, g = 0) {
+  const r = a !== void 0 ? a : Math.random() * 1e4;
+  const v1 = Math.floor(r) & 255;
+  const v2 = Math.floor(r) >> 8;
+  return [v1 & b | d, v1 & c | e, v2 & b | f, v2 & c | g];
+}
+__name(randomList, "randomList");
+function list1(rn) {
+  return randomList(rn, 170, 85, 1, 2, 5, 45 & 170);
+}
+__name(list1, "list1");
+function list2(rn) {
+  return randomList(rn, 170, 85, 1, 0, 0, 0);
+}
+__name(list2, "list2");
+function list3(rn) {
+  return randomList(rn, 170, 85, 1, 0, 5, 0);
+}
+__name(list3, "list3");
+function generateString1(r1, r2, r3) {
+  return fromCharCode(...list1(r1)) + fromCharCode(...list2(r2)) + fromCharCode(...list3(r3));
+}
+__name(generateString1, "generateString1");
+function list4(a, b, c, d, e, f, g, h, i, j, k, m, n, o, p, q, r) {
+  return [
+    44,
+    a,
+    0,
+    0,
+    0,
+    0,
+    24,
+    b,
+    n,
+    0,
+    c,
+    d,
+    0,
+    0,
+    0,
+    1,
+    0,
+    239,
+    e,
+    o,
+    f,
+    g,
+    0,
+    0,
+    0,
+    0,
+    h,
+    0,
+    0,
+    14,
+    i,
+    j,
+    0,
+    k,
+    m,
+    3,
+    p,
+    1,
+    q,
+    1,
+    r,
+    0,
+    0,
+    0
+  ];
+}
+__name(list4, "list4");
+function endCheckNum(a) {
+  let r = 0;
+  for (const v of a) r ^= v;
+  return r;
+}
+__name(endCheckNum, "endCheckNum");
+function rc4Encrypt(plaintext, key) {
+  const s = Array.from({ length: 256 }, (_, i) => i);
+  let j = 0;
+  for (let i = 0; i < 256; i++) {
+    j = (j + s[i] + key.charCodeAt(i % key.length)) % 256;
+    [s[i], s[j]] = [s[j], s[i]];
+  }
+  let ii = 0;
+  j = 0;
+  const cipher = [];
+  for (let k = 0; k < plaintext.length; k++) {
+    ii = (ii + 1) % 256;
+    j = (j + s[ii]) % 256;
+    [s[ii], s[j]] = [s[j], s[ii]];
+    cipher.push(String.fromCharCode(s[(s[ii] + s[j]) % 256] ^ plaintext.charCodeAt(k)));
+  }
+  return cipher.join("");
+}
+__name(rc4Encrypt, "rc4Encrypt");
+function generateString2(urlParams, method = "GET", startTime = 0, endTime = 0) {
+  const browserCode = charCodeAt(BROWSER);
+  startTime = startTime || Date.now();
+  endTime = endTime || startTime + Math.floor(Math.random() * 5) + 4;
+  const paramsArray = sm3ToArray(sm3ToArray(urlParams + END_STRING));
+  const methodArray = sm3ToArray(sm3ToArray(method + END_STRING));
+  const a = list4(
+    endTime >> 24 & 255,
+    paramsArray[21],
+    UA_CODE[23],
+    endTime >> 16 & 255,
+    paramsArray[22],
+    UA_CODE[24],
+    endTime >> 8 & 255,
+    endTime >> 0 & 255,
+    startTime >> 24 & 255,
+    startTime >> 16 & 255,
+    startTime >> 8 & 255,
+    startTime >> 0 & 255,
+    methodArray[21],
+    methodArray[22],
+    Math.floor(endTime / 256 / 256 / 256 / 256) >> 0,
+    Math.floor(startTime / 256 / 256 / 256 / 256) >> 0,
+    BROWSER.length
+  );
+  const e = endCheckNum(a);
+  a.push(...browserCode);
+  a.push(e);
+  return rc4Encrypt(fromCharCode(...a), "y");
+}
+__name(generateString2, "generateString2");
+function generateResult(s, e = "s4") {
+  const table = STR_MAP[e];
+  const r = [];
+  for (let i = 0; i < s.length; i += 3) {
+    let n;
+    if (i + 2 < s.length) n = s.charCodeAt(i) << 16 | s.charCodeAt(i + 1) << 8 | s.charCodeAt(i + 2);
+    else if (i + 1 < s.length) n = s.charCodeAt(i) << 16 | s.charCodeAt(i + 1) << 8;
+    else n = s.charCodeAt(i) << 16;
+    const pairs = [[18, 16515072], [12, 258048], [6, 4032], [0, 63]];
+    for (const [shift, mask] of pairs) {
+      if (shift === 6 && i + 1 >= s.length) break;
+      if (shift === 0 && i + 2 >= s.length) break;
+      r.push(table[(n & mask) >> shift]);
+    }
+  }
+  const pad = (4 - r.length % 4) % 4;
+  for (let i = 0; i < pad; i++) r.push("=");
+  return r.join("");
+}
+__name(generateResult, "generateResult");
+function getABogus(urlParams) {
+  let paramStr;
+  if (typeof urlParams === "object") paramStr = new URLSearchParams(urlParams).toString();
+  else paramStr = urlParams;
+  const string1 = generateString1();
+  const string2 = generateString2(paramStr);
+  return encodeURIComponent(generateResult(string1 + string2, "s4"));
+}
+__name(getABogus, "getABogus");
+
+// lib/douyin.js
+var DOUYIN_DOMAIN = "https://www.douyin.com";
+var POST_DETAIL = `${DOUYIN_DOMAIN}/aweme/v1/web/aweme/detail/`;
+var USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36";
+var VIDEO_URL_PATTERN = /video\/([^/?]*)/;
+var VIDEO_URL_PATTERN_NEW = /[?&]vid=(\d+)/;
+var NOTE_URL_PATTERN = /note\/([^/?]*)/;
+var DISCOVER_URL_PATTERN = /modal_id=([0-9]+)/;
+function buildBaseParams(awemeId) {
+  return {
+    device_platform: "webapp",
+    aid: "6383",
+    channel: "channel_pc_web",
+    pc_client_type: "1",
+    version_code: "290100",
+    version_name: "29.1.0",
+    cookie_enabled: "true",
+    screen_width: "1920",
+    screen_height: "1080",
+    browser_language: "zh-CN",
+    browser_platform: "Win32",
+    browser_name: "Chrome",
+    browser_version: "130.0.0.0",
+    browser_online: "true",
+    engine_name: "Blink",
+    engine_version: "130.0.0.0",
+    os_name: "Windows",
+    os_version: "10",
+    cpu_core_num: "12",
+    device_memory: "8",
+    platform: "PC",
+    downlink: "10",
+    effective_type: "4g",
+    from_user_page: "1",
+    locate_query: "false",
+    need_time_list: "1",
+    pc_libra_divert: "Windows",
+    publish_video_strategy_type: "2",
+    round_trip_time: "0",
+    show_live_replay_strategy: "1",
+    time_list_query: "0",
+    whale_cut_token: "",
+    update_version_code: "170400",
+    msToken: "",
+    aweme_id: awemeId
+  };
+}
+__name(buildBaseParams, "buildBaseParams");
+async function getAwemeId(url) {
+  const response = await fetch(url, {
+    redirect: "follow",
+    headers: { "User-Agent": USER_AGENT }
+  });
+  const responseUrl = response.url;
+  for (const pattern of [VIDEO_URL_PATTERN, VIDEO_URL_PATTERN_NEW, NOTE_URL_PATTERN, DISCOVER_URL_PATTERN]) {
+    const match2 = responseUrl.match(pattern);
+    if (match2) return match2[1];
+  }
+  throw new Error(`\u65E0\u6CD5\u4ECE URL \u4E2D\u63D0\u53D6 aweme_id: ${responseUrl}`);
+}
+__name(getAwemeId, "getAwemeId");
+async function fetchOneVideo(awemeId, cookie) {
+  const params = buildBaseParams(awemeId);
+  const aBogus = getABogus(params);
+  const queryString = new URLSearchParams(params).toString();
+  const endpoint = `${POST_DETAIL}?${queryString}&a_bogus=${aBogus}`;
+  const response = await fetch(endpoint, {
+    headers: {
+      "Accept-Language": "zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2",
+      "User-Agent": USER_AGENT,
+      "Referer": "https://www.douyin.com/",
+      "Cookie": cookie
+    }
+  });
+  if (!response.ok) {
+    throw new Error(`\u6296\u97F3 API \u8BF7\u6C42\u5931\u8D25: ${response.status} ${response.statusText}`);
+  }
+  return await response.json();
+}
+__name(fetchOneVideo, "fetchOneVideo");
+
 // api/parse.js
-var API_BASE = "https://api.douyin.wtf";
 var QUALITY_LABELS = {
   72: "4K",
   7: "1440p",
@@ -98,7 +495,7 @@ function formatCount(n) {
 }
 __name(formatCount, "formatCount");
 async function onRequestGet2(context) {
-  const { request } = context;
+  const { request, env } = context;
   const url = new URL(request.url);
   const targetUrl = url.searchParams.get("url");
   if (!targetUrl) {
@@ -107,27 +504,25 @@ async function onRequestGet2(context) {
       { status: 400 }
     );
   }
+  const urlMatch = targetUrl.match(/https?:\/\/[^\s]+/);
+  const cleanUrl = urlMatch ? urlMatch[0] : targetUrl;
+  const cookie = env.DOUYIN_COOKIE;
+  if (!cookie) {
+    return Response.json(
+      { code: 500, message: "\u670D\u52A1\u5668\u672A\u914D\u7F6E DOUYIN_COOKIE" },
+      { status: 500 }
+    );
+  }
   try {
-    const apiUrl = `${API_BASE}/api/hybrid/video_data?url=${encodeURIComponent(targetUrl)}`;
-    const resp = await fetch(apiUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-      }
-    });
-    if (!resp.ok) {
+    const awemeId = await getAwemeId(cleanUrl);
+    const json = await fetchOneVideo(awemeId, cookie);
+    const detail = json.aweme_detail;
+    if (!detail) {
       return Response.json(
-        { code: resp.status, message: "API \u8BF7\u6C42\u5931\u8D25" },
-        { status: 502 }
-      );
-    }
-    const json = await resp.json();
-    if (json.code !== 200 || !json.data) {
-      return Response.json(
-        { code: 404, message: "\u65E0\u6CD5\u89E3\u6790\u8BE5\u94FE\u63A5\uFF0C\u8BF7\u68C0\u67E5\u94FE\u63A5\u662F\u5426\u6B63\u786E" },
+        { code: 404, message: "\u65E0\u6CD5\u89E3\u6790\u8BE5\u94FE\u63A5\uFF0C\u89C6\u9891\u53EF\u80FD\u5DF2\u5220\u9664" },
         { status: 404 }
       );
     }
-    const detail = json.data.aweme_detail || json.data;
     const isImagePost = detail.images && detail.images.length > 0;
     const author = detail.author || {};
     const stats = detail.statistics || {};
@@ -141,7 +536,6 @@ async function onRequestGet2(context) {
         desc: detail.desc || "",
         createTime: detail.create_time,
         duration: detail.duration,
-        // 毫秒
         author: {
           nickname: author.nickname || "",
           avatar: author.avatar_thumb?.url_list?.[0] || "",
@@ -169,9 +563,7 @@ async function onRequestGet2(context) {
         height: img.height
       }));
     } else {
-      result.data.qualities = extractVideoQualities(
-        detail.video?.bit_rate
-      );
+      result.data.qualities = extractVideoQualities(detail.video?.bit_rate);
       if (result.data.qualities.length === 0 && detail.video?.play_addr) {
         result.data.qualities = [
           {
@@ -196,14 +588,14 @@ async function onRequestGet2(context) {
     });
   } catch (err) {
     return Response.json(
-      { code: 500, message: "\u670D\u52A1\u5668\u5185\u90E8\u9519\u8BEF: " + err.message },
+      { code: 500, message: "\u89E3\u6790\u5931\u8D25: " + err.message },
       { status: 500 }
     );
   }
 }
 __name(onRequestGet2, "onRequestGet");
 
-// ../.wrangler/tmp/pages-AXsvEw/functionsRoutes-0.0441989938713544.mjs
+// ../.wrangler/tmp/pages-Xg8TUH/functionsRoutes-0.9507284595646687.mjs
 var routes = [
   {
     routePath: "/api/download",
@@ -708,7 +1100,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// ../.wrangler/tmp/bundle-NufMly/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-NQQucQ/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -740,7 +1132,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// ../.wrangler/tmp/bundle-NufMly/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-NQQucQ/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
@@ -840,4 +1232,4 @@ export {
   __INTERNAL_WRANGLER_MIDDLEWARE__,
   middleware_loader_entry_default as default
 };
-//# sourceMappingURL=functionsWorker-0.8782016881571232.mjs.map
+//# sourceMappingURL=functionsWorker-0.513098410070372.mjs.map

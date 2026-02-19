@@ -1,9 +1,7 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// .wrangler/tmp/pages-AXsvEw/functionsWorker-0.8782016881571232.mjs
-var __defProp2 = Object.defineProperty;
-var __name2 = /* @__PURE__ */ __name((target, value) => __defProp2(target, "name", { value, configurable: true }), "__name");
+// api/download.js
 async function onRequestGet(context) {
   const { request } = context;
   const url = new URL(request.url);
@@ -50,8 +48,406 @@ async function onRequestGet(context) {
   }
 }
 __name(onRequestGet, "onRequestGet");
-__name2(onRequestGet, "onRequestGet");
-var API_BASE = "https://api.douyin.wtf";
+
+// lib/sm3.js
+var T = [];
+for (let i = 0; i < 16; i++) T[i] = 2043430169;
+for (let i = 16; i < 64; i++) T[i] = 2055708042;
+function leftRotate(x, n) {
+  n %= 32;
+  return (x << n | x >>> 32 - n) >>> 0;
+}
+__name(leftRotate, "leftRotate");
+function FF(x, y, z, j) {
+  if (j < 16) return (x ^ y ^ z) >>> 0;
+  return (x & y | x & z | y & z) >>> 0;
+}
+__name(FF, "FF");
+function GG(x, y, z, j) {
+  if (j < 16) return (x ^ y ^ z) >>> 0;
+  return (x & y | ~x & z) >>> 0;
+}
+__name(GG, "GG");
+function P0(x) {
+  return (x ^ leftRotate(x, 9) ^ leftRotate(x, 17)) >>> 0;
+}
+__name(P0, "P0");
+function P1(x) {
+  return (x ^ leftRotate(x, 15) ^ leftRotate(x, 23)) >>> 0;
+}
+__name(P1, "P1");
+function paddingMsg(msg) {
+  const len = msg.length;
+  const bitLen = len * 8;
+  msg.push(128);
+  while (msg.length % 64 !== 56) msg.push(0);
+  const hi = Math.floor(bitLen / 4294967296) >>> 0;
+  const lo = (bitLen & 4294967295) >>> 0;
+  for (let i = 3; i >= 0; i--) msg.push(hi >>> i * 8 & 255);
+  for (let i = 3; i >= 0; i--) msg.push(lo >>> i * 8 & 255);
+  return msg;
+}
+__name(paddingMsg, "paddingMsg");
+function sm3Hash(inputBytes) {
+  const msg = paddingMsg([...inputBytes]);
+  let V = [
+    1937774191,
+    1226093241,
+    388252375,
+    3666478592,
+    2842636476,
+    372324522,
+    3817729613,
+    2969243214
+  ];
+  const blocks = msg.length / 64;
+  for (let b = 0; b < blocks; b++) {
+    const offset = b * 64;
+    const W = new Array(68);
+    const W1 = new Array(64);
+    for (let i = 0; i < 16; i++) {
+      W[i] = (msg[offset + i * 4] << 24 | msg[offset + i * 4 + 1] << 16 | msg[offset + i * 4 + 2] << 8 | msg[offset + i * 4 + 3]) >>> 0;
+    }
+    for (let i = 16; i < 68; i++) {
+      W[i] = (P1(W[i - 16] ^ W[i - 9] ^ leftRotate(W[i - 3], 15)) ^ leftRotate(W[i - 13], 7) ^ W[i - 6]) >>> 0;
+    }
+    for (let i = 0; i < 64; i++) {
+      W1[i] = (W[i] ^ W[i + 4]) >>> 0;
+    }
+    let [A, B, C, D, E, F, G, H] = V;
+    for (let j = 0; j < 64; j++) {
+      const SS1 = leftRotate(leftRotate(A, 12) + E + leftRotate(T[j], j) >>> 0, 7);
+      const SS2 = (SS1 ^ leftRotate(A, 12)) >>> 0;
+      const TT1 = FF(A, B, C, j) + D + SS2 + W1[j] >>> 0;
+      const TT2 = GG(E, F, G, j) + H + SS1 + W[j] >>> 0;
+      D = C;
+      C = leftRotate(B, 9);
+      B = A;
+      A = TT1;
+      H = G;
+      G = leftRotate(F, 19);
+      F = E;
+      E = P0(TT2);
+    }
+    V[0] = (V[0] ^ A) >>> 0;
+    V[1] = (V[1] ^ B) >>> 0;
+    V[2] = (V[2] ^ C) >>> 0;
+    V[3] = (V[3] ^ D) >>> 0;
+    V[4] = (V[4] ^ E) >>> 0;
+    V[5] = (V[5] ^ F) >>> 0;
+    V[6] = (V[6] ^ G) >>> 0;
+    V[7] = (V[7] ^ H) >>> 0;
+  }
+  const result = [];
+  for (let i = 0; i < 8; i++) {
+    result.push(V[i] >>> 24 & 255, V[i] >>> 16 & 255, V[i] >>> 8 & 255, V[i] & 255);
+  }
+  return result;
+}
+__name(sm3Hash, "sm3Hash");
+function sm3ToArray(data) {
+  let bytes;
+  if (typeof data === "string") {
+    bytes = Array.from(new TextEncoder().encode(data));
+  } else {
+    bytes = Array.from(data);
+  }
+  return sm3Hash(bytes);
+}
+__name(sm3ToArray, "sm3ToArray");
+
+// lib/abogus.js
+var STR_MAP = {
+  s0: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=",
+  s1: "Dkdpgh4ZKsQB80/Mfvw36XI1R25+WUAlEi7NLboqYTOPuzmFjJnryx9HVGcaStCe=",
+  s2: "Dkdpgh4ZKsQB80/Mfvw36XI1R25-WUAlEi7NLboqYTOPuzmFjJnryx9HVGcaStCe=",
+  s3: "ckdp1h4ZKsUB80/Mfvw36XIgR25+WQAlEi7NLboqYTOPuzKFjJnry79HbGcaStCe",
+  s4: "Dkdpgh2ZmsQB80/MfvV36XI1R45-WUAlEixNLwoqYTOPuzKFjJnry79HbGcaStCe"
+};
+var END_STRING = "cus";
+var BROWSER = "1536|742|1536|864|0|0|0|0|1536|864|1536|864|1536|742|24|24|MacIntel";
+var UA_CODE = [
+  76,
+  98,
+  15,
+  131,
+  97,
+  245,
+  224,
+  133,
+  122,
+  199,
+  241,
+  166,
+  79,
+  34,
+  90,
+  191,
+  128,
+  126,
+  122,
+  98,
+  66,
+  11,
+  14,
+  40,
+  49,
+  110,
+  110,
+  173,
+  67,
+  96,
+  138,
+  252
+];
+function charCodeAt(s) {
+  return Array.from(s).map((c) => c.charCodeAt(0));
+}
+__name(charCodeAt, "charCodeAt");
+function fromCharCode(...args) {
+  return args.map((c) => String.fromCharCode(c)).join("");
+}
+__name(fromCharCode, "fromCharCode");
+function randomList(a, b = 170, c = 85, d = 0, e = 0, f = 0, g = 0) {
+  const r = a !== void 0 ? a : Math.random() * 1e4;
+  const v1 = Math.floor(r) & 255;
+  const v2 = Math.floor(r) >> 8;
+  return [v1 & b | d, v1 & c | e, v2 & b | f, v2 & c | g];
+}
+__name(randomList, "randomList");
+function list1(rn) {
+  return randomList(rn, 170, 85, 1, 2, 5, 45 & 170);
+}
+__name(list1, "list1");
+function list2(rn) {
+  return randomList(rn, 170, 85, 1, 0, 0, 0);
+}
+__name(list2, "list2");
+function list3(rn) {
+  return randomList(rn, 170, 85, 1, 0, 5, 0);
+}
+__name(list3, "list3");
+function generateString1(r1, r2, r3) {
+  return fromCharCode(...list1(r1)) + fromCharCode(...list2(r2)) + fromCharCode(...list3(r3));
+}
+__name(generateString1, "generateString1");
+function list4(a, b, c, d, e, f, g, h, i, j, k, m, n, o, p, q, r) {
+  return [
+    44,
+    a,
+    0,
+    0,
+    0,
+    0,
+    24,
+    b,
+    n,
+    0,
+    c,
+    d,
+    0,
+    0,
+    0,
+    1,
+    0,
+    239,
+    e,
+    o,
+    f,
+    g,
+    0,
+    0,
+    0,
+    0,
+    h,
+    0,
+    0,
+    14,
+    i,
+    j,
+    0,
+    k,
+    m,
+    3,
+    p,
+    1,
+    q,
+    1,
+    r,
+    0,
+    0,
+    0
+  ];
+}
+__name(list4, "list4");
+function endCheckNum(a) {
+  let r = 0;
+  for (const v of a) r ^= v;
+  return r;
+}
+__name(endCheckNum, "endCheckNum");
+function rc4Encrypt(plaintext, key) {
+  const s = Array.from({ length: 256 }, (_, i) => i);
+  let j = 0;
+  for (let i = 0; i < 256; i++) {
+    j = (j + s[i] + key.charCodeAt(i % key.length)) % 256;
+    [s[i], s[j]] = [s[j], s[i]];
+  }
+  let ii = 0;
+  j = 0;
+  const cipher = [];
+  for (let k = 0; k < plaintext.length; k++) {
+    ii = (ii + 1) % 256;
+    j = (j + s[ii]) % 256;
+    [s[ii], s[j]] = [s[j], s[ii]];
+    cipher.push(String.fromCharCode(s[(s[ii] + s[j]) % 256] ^ plaintext.charCodeAt(k)));
+  }
+  return cipher.join("");
+}
+__name(rc4Encrypt, "rc4Encrypt");
+function generateString2(urlParams, method = "GET", startTime = 0, endTime = 0) {
+  const browserCode = charCodeAt(BROWSER);
+  startTime = startTime || Date.now();
+  endTime = endTime || startTime + Math.floor(Math.random() * 5) + 4;
+  const paramsArray = sm3ToArray(sm3ToArray(urlParams + END_STRING));
+  const methodArray = sm3ToArray(sm3ToArray(method + END_STRING));
+  const a = list4(
+    endTime >> 24 & 255,
+    paramsArray[21],
+    UA_CODE[23],
+    endTime >> 16 & 255,
+    paramsArray[22],
+    UA_CODE[24],
+    endTime >> 8 & 255,
+    endTime >> 0 & 255,
+    startTime >> 24 & 255,
+    startTime >> 16 & 255,
+    startTime >> 8 & 255,
+    startTime >> 0 & 255,
+    methodArray[21],
+    methodArray[22],
+    Math.floor(endTime / 256 / 256 / 256 / 256) >> 0,
+    Math.floor(startTime / 256 / 256 / 256 / 256) >> 0,
+    BROWSER.length
+  );
+  const e = endCheckNum(a);
+  a.push(...browserCode);
+  a.push(e);
+  return rc4Encrypt(fromCharCode(...a), "y");
+}
+__name(generateString2, "generateString2");
+function generateResult(s, e = "s4") {
+  const table = STR_MAP[e];
+  const r = [];
+  for (let i = 0; i < s.length; i += 3) {
+    let n;
+    if (i + 2 < s.length) n = s.charCodeAt(i) << 16 | s.charCodeAt(i + 1) << 8 | s.charCodeAt(i + 2);
+    else if (i + 1 < s.length) n = s.charCodeAt(i) << 16 | s.charCodeAt(i + 1) << 8;
+    else n = s.charCodeAt(i) << 16;
+    const pairs = [[18, 16515072], [12, 258048], [6, 4032], [0, 63]];
+    for (const [shift, mask] of pairs) {
+      if (shift === 6 && i + 1 >= s.length) break;
+      if (shift === 0 && i + 2 >= s.length) break;
+      r.push(table[(n & mask) >> shift]);
+    }
+  }
+  const pad = (4 - r.length % 4) % 4;
+  for (let i = 0; i < pad; i++) r.push("=");
+  return r.join("");
+}
+__name(generateResult, "generateResult");
+function getABogus(urlParams) {
+  let paramStr;
+  if (typeof urlParams === "object") paramStr = new URLSearchParams(urlParams).toString();
+  else paramStr = urlParams;
+  const string1 = generateString1();
+  const string2 = generateString2(paramStr);
+  return encodeURIComponent(generateResult(string1 + string2, "s4"));
+}
+__name(getABogus, "getABogus");
+
+// lib/douyin.js
+var DOUYIN_DOMAIN = "https://www.douyin.com";
+var POST_DETAIL = `${DOUYIN_DOMAIN}/aweme/v1/web/aweme/detail/`;
+var USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36";
+var VIDEO_URL_PATTERN = /video\/([^/?]*)/;
+var VIDEO_URL_PATTERN_NEW = /[?&]vid=(\d+)/;
+var NOTE_URL_PATTERN = /note\/([^/?]*)/;
+var DISCOVER_URL_PATTERN = /modal_id=([0-9]+)/;
+function buildBaseParams(awemeId) {
+  return {
+    device_platform: "webapp",
+    aid: "6383",
+    channel: "channel_pc_web",
+    pc_client_type: "1",
+    version_code: "290100",
+    version_name: "29.1.0",
+    cookie_enabled: "true",
+    screen_width: "1920",
+    screen_height: "1080",
+    browser_language: "zh-CN",
+    browser_platform: "Win32",
+    browser_name: "Chrome",
+    browser_version: "130.0.0.0",
+    browser_online: "true",
+    engine_name: "Blink",
+    engine_version: "130.0.0.0",
+    os_name: "Windows",
+    os_version: "10",
+    cpu_core_num: "12",
+    device_memory: "8",
+    platform: "PC",
+    downlink: "10",
+    effective_type: "4g",
+    from_user_page: "1",
+    locate_query: "false",
+    need_time_list: "1",
+    pc_libra_divert: "Windows",
+    publish_video_strategy_type: "2",
+    round_trip_time: "0",
+    show_live_replay_strategy: "1",
+    time_list_query: "0",
+    whale_cut_token: "",
+    update_version_code: "170400",
+    msToken: "",
+    aweme_id: awemeId
+  };
+}
+__name(buildBaseParams, "buildBaseParams");
+async function getAwemeId(url) {
+  const response = await fetch(url, {
+    redirect: "follow",
+    headers: { "User-Agent": USER_AGENT }
+  });
+  const responseUrl = response.url;
+  for (const pattern of [VIDEO_URL_PATTERN, VIDEO_URL_PATTERN_NEW, NOTE_URL_PATTERN, DISCOVER_URL_PATTERN]) {
+    const match2 = responseUrl.match(pattern);
+    if (match2) return match2[1];
+  }
+  throw new Error(`\u65E0\u6CD5\u4ECE URL \u4E2D\u63D0\u53D6 aweme_id: ${responseUrl}`);
+}
+__name(getAwemeId, "getAwemeId");
+async function fetchOneVideo(awemeId, cookie) {
+  const params = buildBaseParams(awemeId);
+  const aBogus = getABogus(params);
+  const queryString = new URLSearchParams(params).toString();
+  const endpoint = `${POST_DETAIL}?${queryString}&a_bogus=${aBogus}`;
+  const response = await fetch(endpoint, {
+    headers: {
+      "Accept-Language": "zh-CN,zh;q=0.8,zh-TW;q=0.7,zh-HK;q=0.5,en-US;q=0.3,en;q=0.2",
+      "User-Agent": USER_AGENT,
+      "Referer": "https://www.douyin.com/",
+      "Cookie": cookie
+    }
+  });
+  if (!response.ok) {
+    throw new Error(`\u6296\u97F3 API \u8BF7\u6C42\u5931\u8D25: ${response.status} ${response.statusText}`);
+  }
+  return await response.json();
+}
+__name(fetchOneVideo, "fetchOneVideo");
+
+// api/parse.js
 var QUALITY_LABELS = {
   72: "4K",
   7: "1440p",
@@ -67,7 +463,6 @@ function getQualityLabel(qualityType, height, fps) {
   return fps > 30 ? `${base} ${fps}fps` : base;
 }
 __name(getQualityLabel, "getQualityLabel");
-__name2(getQualityLabel, "getQualityLabel");
 function extractVideoQualities(bitRateList) {
   if (!bitRateList || !Array.isArray(bitRateList)) return [];
   const seen = /* @__PURE__ */ new Set();
@@ -93,16 +488,14 @@ function extractVideoQualities(bitRateList) {
   }).filter(Boolean);
 }
 __name(extractVideoQualities, "extractVideoQualities");
-__name2(extractVideoQualities, "extractVideoQualities");
 function formatCount(n) {
   if (!n || n === 0) return "0";
   if (n >= 1e4) return (n / 1e4).toFixed(1) + "\u4E07";
   return String(n);
 }
 __name(formatCount, "formatCount");
-__name2(formatCount, "formatCount");
 async function onRequestGet2(context) {
-  const { request } = context;
+  const { request, env } = context;
   const url = new URL(request.url);
   const targetUrl = url.searchParams.get("url");
   if (!targetUrl) {
@@ -111,27 +504,25 @@ async function onRequestGet2(context) {
       { status: 400 }
     );
   }
+  const urlMatch = targetUrl.match(/https?:\/\/[^\s]+/);
+  const cleanUrl = urlMatch ? urlMatch[0] : targetUrl;
+  const cookie = env.DOUYIN_COOKIE;
+  if (!cookie) {
+    return Response.json(
+      { code: 500, message: "\u670D\u52A1\u5668\u672A\u914D\u7F6E DOUYIN_COOKIE" },
+      { status: 500 }
+    );
+  }
   try {
-    const apiUrl = `${API_BASE}/api/hybrid/video_data?url=${encodeURIComponent(targetUrl)}`;
-    const resp = await fetch(apiUrl, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-      }
-    });
-    if (!resp.ok) {
+    const awemeId = await getAwemeId(cleanUrl);
+    const json = await fetchOneVideo(awemeId, cookie);
+    const detail = json.aweme_detail;
+    if (!detail) {
       return Response.json(
-        { code: resp.status, message: "API \u8BF7\u6C42\u5931\u8D25" },
-        { status: 502 }
-      );
-    }
-    const json = await resp.json();
-    if (json.code !== 200 || !json.data) {
-      return Response.json(
-        { code: 404, message: "\u65E0\u6CD5\u89E3\u6790\u8BE5\u94FE\u63A5\uFF0C\u8BF7\u68C0\u67E5\u94FE\u63A5\u662F\u5426\u6B63\u786E" },
+        { code: 404, message: "\u65E0\u6CD5\u89E3\u6790\u8BE5\u94FE\u63A5\uFF0C\u89C6\u9891\u53EF\u80FD\u5DF2\u5220\u9664" },
         { status: 404 }
       );
     }
-    const detail = json.data.aweme_detail || json.data;
     const isImagePost = detail.images && detail.images.length > 0;
     const author = detail.author || {};
     const stats = detail.statistics || {};
@@ -145,7 +536,6 @@ async function onRequestGet2(context) {
         desc: detail.desc || "",
         createTime: detail.create_time,
         duration: detail.duration,
-        // 毫秒
         author: {
           nickname: author.nickname || "",
           avatar: author.avatar_thumb?.url_list?.[0] || "",
@@ -173,9 +563,7 @@ async function onRequestGet2(context) {
         height: img.height
       }));
     } else {
-      result.data.qualities = extractVideoQualities(
-        detail.video?.bit_rate
-      );
+      result.data.qualities = extractVideoQualities(detail.video?.bit_rate);
       if (result.data.qualities.length === 0 && detail.video?.play_addr) {
         result.data.qualities = [
           {
@@ -200,13 +588,14 @@ async function onRequestGet2(context) {
     });
   } catch (err) {
     return Response.json(
-      { code: 500, message: "\u670D\u52A1\u5668\u5185\u90E8\u9519\u8BEF: " + err.message },
+      { code: 500, message: "\u89E3\u6790\u5931\u8D25: " + err.message },
       { status: 500 }
     );
   }
 }
-__name(onRequestGet2, "onRequestGet2");
-__name2(onRequestGet2, "onRequestGet");
+__name(onRequestGet2, "onRequestGet");
+
+// ../.wrangler/tmp/pages-TvXRcD/functionsRoutes-0.6801126549870475.mjs
 var routes = [
   {
     routePath: "/api/download",
@@ -223,6 +612,8 @@ var routes = [
     modules: [onRequestGet2]
   }
 ];
+
+// C:/Users/id654/AppData/Roaming/npm/node_modules/wrangler/node_modules/path-to-regexp/dist.es2015/index.js
 function lexer(str) {
   var tokens = [];
   var i = 0;
@@ -307,7 +698,6 @@ function lexer(str) {
   return tokens;
 }
 __name(lexer, "lexer");
-__name2(lexer, "lexer");
 function parse(str, options) {
   if (options === void 0) {
     options = {};
@@ -318,18 +708,18 @@ function parse(str, options) {
   var key = 0;
   var i = 0;
   var path = "";
-  var tryConsume = /* @__PURE__ */ __name2(function(type) {
+  var tryConsume = /* @__PURE__ */ __name(function(type) {
     if (i < tokens.length && tokens[i].type === type)
       return tokens[i++].value;
   }, "tryConsume");
-  var mustConsume = /* @__PURE__ */ __name2(function(type) {
+  var mustConsume = /* @__PURE__ */ __name(function(type) {
     var value2 = tryConsume(type);
     if (value2 !== void 0)
       return value2;
     var _a2 = tokens[i], nextType = _a2.type, index = _a2.index;
     throw new TypeError("Unexpected ".concat(nextType, " at ").concat(index, ", expected ").concat(type));
   }, "mustConsume");
-  var consumeText = /* @__PURE__ */ __name2(function() {
+  var consumeText = /* @__PURE__ */ __name(function() {
     var result2 = "";
     var value2;
     while (value2 = tryConsume("CHAR") || tryConsume("ESCAPED_CHAR")) {
@@ -337,7 +727,7 @@ function parse(str, options) {
     }
     return result2;
   }, "consumeText");
-  var isSafe = /* @__PURE__ */ __name2(function(value2) {
+  var isSafe = /* @__PURE__ */ __name(function(value2) {
     for (var _i = 0, delimiter_1 = delimiter; _i < delimiter_1.length; _i++) {
       var char2 = delimiter_1[_i];
       if (value2.indexOf(char2) > -1)
@@ -345,7 +735,7 @@ function parse(str, options) {
     }
     return false;
   }, "isSafe");
-  var safePattern = /* @__PURE__ */ __name2(function(prefix2) {
+  var safePattern = /* @__PURE__ */ __name(function(prefix2) {
     var prev = result[result.length - 1];
     var prevText = prefix2 || (prev && typeof prev === "string" ? prev : "");
     if (prev && !prevText) {
@@ -408,14 +798,12 @@ function parse(str, options) {
   return result;
 }
 __name(parse, "parse");
-__name2(parse, "parse");
 function match(str, options) {
   var keys = [];
   var re = pathToRegexp(str, keys, options);
   return regexpToFunction(re, keys, options);
 }
 __name(match, "match");
-__name2(match, "match");
 function regexpToFunction(re, keys, options) {
   if (options === void 0) {
     options = {};
@@ -429,7 +817,7 @@ function regexpToFunction(re, keys, options) {
       return false;
     var path = m[0], index = m.index;
     var params = /* @__PURE__ */ Object.create(null);
-    var _loop_1 = /* @__PURE__ */ __name2(function(i2) {
+    var _loop_1 = /* @__PURE__ */ __name(function(i2) {
       if (m[i2] === void 0)
         return "continue";
       var key = keys[i2 - 1];
@@ -448,17 +836,14 @@ function regexpToFunction(re, keys, options) {
   };
 }
 __name(regexpToFunction, "regexpToFunction");
-__name2(regexpToFunction, "regexpToFunction");
 function escapeString(str) {
   return str.replace(/([.+*?=^!:${}()[\]|/\\])/g, "\\$1");
 }
 __name(escapeString, "escapeString");
-__name2(escapeString, "escapeString");
 function flags(options) {
   return options && options.sensitive ? "" : "i";
 }
 __name(flags, "flags");
-__name2(flags, "flags");
 function regexpToRegexp(path, keys) {
   if (!keys)
     return path;
@@ -479,7 +864,6 @@ function regexpToRegexp(path, keys) {
   return path;
 }
 __name(regexpToRegexp, "regexpToRegexp");
-__name2(regexpToRegexp, "regexpToRegexp");
 function arrayToRegexp(paths, keys, options) {
   var parts = paths.map(function(path) {
     return pathToRegexp(path, keys, options).source;
@@ -487,12 +871,10 @@ function arrayToRegexp(paths, keys, options) {
   return new RegExp("(?:".concat(parts.join("|"), ")"), flags(options));
 }
 __name(arrayToRegexp, "arrayToRegexp");
-__name2(arrayToRegexp, "arrayToRegexp");
 function stringToRegexp(path, keys, options) {
   return tokensToRegexp(parse(path, options), keys, options);
 }
 __name(stringToRegexp, "stringToRegexp");
-__name2(stringToRegexp, "stringToRegexp");
 function tokensToRegexp(tokens, keys, options) {
   if (options === void 0) {
     options = {};
@@ -548,7 +930,6 @@ function tokensToRegexp(tokens, keys, options) {
   return new RegExp(route, flags(options));
 }
 __name(tokensToRegexp, "tokensToRegexp");
-__name2(tokensToRegexp, "tokensToRegexp");
 function pathToRegexp(path, keys, options) {
   if (path instanceof RegExp)
     return regexpToRegexp(path, keys);
@@ -557,7 +938,8 @@ function pathToRegexp(path, keys, options) {
   return stringToRegexp(path, keys, options);
 }
 __name(pathToRegexp, "pathToRegexp");
-__name2(pathToRegexp, "pathToRegexp");
+
+// C:/Users/id654/AppData/Roaming/npm/node_modules/wrangler/templates/pages-template-worker.ts
 var escapeRegex = /[.+?^${}()|[\]\\]/g;
 function* executeRequest(request) {
   const requestPath = new URL(request.url).pathname;
@@ -608,14 +990,13 @@ function* executeRequest(request) {
   }
 }
 __name(executeRequest, "executeRequest");
-__name2(executeRequest, "executeRequest");
 var pages_template_worker_default = {
   async fetch(originalRequest, env, workerContext) {
     let request = originalRequest;
     const handlerIterator = executeRequest(request);
     let data = {};
     let isFailOpen = false;
-    const next = /* @__PURE__ */ __name2(async (input, init) => {
+    const next = /* @__PURE__ */ __name(async (input, init) => {
       if (input !== void 0) {
         let url = input;
         if (typeof input === "string") {
@@ -642,7 +1023,7 @@ var pages_template_worker_default = {
           },
           env,
           waitUntil: workerContext.waitUntil.bind(workerContext),
-          passThroughOnException: /* @__PURE__ */ __name2(() => {
+          passThroughOnException: /* @__PURE__ */ __name(() => {
             isFailOpen = true;
           }, "passThroughOnException")
         };
@@ -670,14 +1051,16 @@ var pages_template_worker_default = {
     }
   }
 };
-var cloneResponse = /* @__PURE__ */ __name2((response) => (
+var cloneResponse = /* @__PURE__ */ __name((response) => (
   // https://fetch.spec.whatwg.org/#null-body-status
   new Response(
     [101, 204, 205, 304].includes(response.status) ? null : response.body,
     response
   )
 ), "cloneResponse");
-var drainBody = /* @__PURE__ */ __name2(async (request, env, _ctx, middlewareCtx) => {
+
+// C:/Users/id654/AppData/Roaming/npm/node_modules/wrangler/templates/middleware/middleware-ensure-req-body-drained.ts
+var drainBody = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx) => {
   try {
     return await middlewareCtx.next(request, env);
   } finally {
@@ -693,6 +1076,8 @@ var drainBody = /* @__PURE__ */ __name2(async (request, env, _ctx, middlewareCtx
   }
 }, "drainBody");
 var middleware_ensure_req_body_drained_default = drainBody;
+
+// C:/Users/id654/AppData/Roaming/npm/node_modules/wrangler/templates/middleware/middleware-miniflare3-json-error.ts
 function reduceError(e) {
   return {
     name: e?.name,
@@ -702,8 +1087,7 @@ function reduceError(e) {
   };
 }
 __name(reduceError, "reduceError");
-__name2(reduceError, "reduceError");
-var jsonError = /* @__PURE__ */ __name2(async (request, env, _ctx, middlewareCtx) => {
+var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx) => {
   try {
     return await middlewareCtx.next(request, env);
   } catch (e) {
@@ -715,17 +1099,20 @@ var jsonError = /* @__PURE__ */ __name2(async (request, env, _ctx, middlewareCtx
   }
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
+
+// ../.wrangler/tmp/bundle-16kCKi/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
 ];
 var middleware_insertion_facade_default = pages_template_worker_default;
+
+// C:/Users/id654/AppData/Roaming/npm/node_modules/wrangler/templates/middleware/common.ts
 var __facade_middleware__ = [];
 function __facade_register__(...args) {
   __facade_middleware__.push(...args.flat());
 }
 __name(__facade_register__, "__facade_register__");
-__name2(__facade_register__, "__facade_register__");
 function __facade_invokeChain__(request, env, ctx, dispatch, middlewareChain) {
   const [head, ...tail] = middlewareChain;
   const middlewareCtx = {
@@ -737,7 +1124,6 @@ function __facade_invokeChain__(request, env, ctx, dispatch, middlewareChain) {
   return head(request, env, ctx, middlewareCtx);
 }
 __name(__facade_invokeChain__, "__facade_invokeChain__");
-__name2(__facade_invokeChain__, "__facade_invokeChain__");
 function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
   return __facade_invokeChain__(request, env, ctx, dispatch, [
     ...__facade_middleware__,
@@ -745,18 +1131,16 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
   ]);
 }
 __name(__facade_invoke__, "__facade_invoke__");
-__name2(__facade_invoke__, "__facade_invoke__");
+
+// ../.wrangler/tmp/bundle-16kCKi/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
-  static {
-    __name(this, "___Facade_ScheduledController__");
-  }
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
     this.cron = cron;
     this.#noRetry = noRetry;
   }
   static {
-    __name2(this, "__Facade_ScheduledController__");
+    __name(this, "__Facade_ScheduledController__");
   }
   #noRetry;
   noRetry() {
@@ -773,7 +1157,7 @@ function wrapExportedHandler(worker) {
   for (const middleware of __INTERNAL_WRANGLER_MIDDLEWARE__) {
     __facade_register__(middleware);
   }
-  const fetchDispatcher = /* @__PURE__ */ __name2(function(request, env, ctx) {
+  const fetchDispatcher = /* @__PURE__ */ __name(function(request, env, ctx) {
     if (worker.fetch === void 0) {
       throw new Error("Handler does not export a fetch() function.");
     }
@@ -782,7 +1166,7 @@ function wrapExportedHandler(worker) {
   return {
     ...worker,
     fetch(request, env, ctx) {
-      const dispatcher = /* @__PURE__ */ __name2(function(type, init) {
+      const dispatcher = /* @__PURE__ */ __name(function(type, init) {
         if (type === "scheduled" && worker.scheduled !== void 0) {
           const controller = new __Facade_ScheduledController__(
             Date.now(),
@@ -798,7 +1182,6 @@ function wrapExportedHandler(worker) {
   };
 }
 __name(wrapExportedHandler, "wrapExportedHandler");
-__name2(wrapExportedHandler, "wrapExportedHandler");
 function wrapWorkerEntrypoint(klass) {
   if (__INTERNAL_WRANGLER_MIDDLEWARE__ === void 0 || __INTERNAL_WRANGLER_MIDDLEWARE__.length === 0) {
     return klass;
@@ -807,7 +1190,7 @@ function wrapWorkerEntrypoint(klass) {
     __facade_register__(middleware);
   }
   return class extends klass {
-    #fetchDispatcher = /* @__PURE__ */ __name2((request, env, ctx) => {
+    #fetchDispatcher = /* @__PURE__ */ __name((request, env, ctx) => {
       this.env = env;
       this.ctx = ctx;
       if (super.fetch === void 0) {
@@ -815,7 +1198,7 @@ function wrapWorkerEntrypoint(klass) {
       }
       return super.fetch(request);
     }, "#fetchDispatcher");
-    #dispatcher = /* @__PURE__ */ __name2((type, init) => {
+    #dispatcher = /* @__PURE__ */ __name((type, init) => {
       if (type === "scheduled" && super.scheduled !== void 0) {
         const controller = new __Facade_ScheduledController__(
           Date.now(),
@@ -838,7 +1221,6 @@ function wrapWorkerEntrypoint(klass) {
   };
 }
 __name(wrapWorkerEntrypoint, "wrapWorkerEntrypoint");
-__name2(wrapWorkerEntrypoint, "wrapWorkerEntrypoint");
 var WRAPPED_ENTRY;
 if (typeof middleware_insertion_facade_default === "object") {
   WRAPPED_ENTRY = wrapExportedHandler(middleware_insertion_facade_default);
@@ -846,178 +1228,8 @@ if (typeof middleware_insertion_facade_default === "object") {
   WRAPPED_ENTRY = wrapWorkerEntrypoint(middleware_insertion_facade_default);
 }
 var middleware_loader_entry_default = WRAPPED_ENTRY;
-
-// C:/Users/id654/AppData/Roaming/npm/node_modules/wrangler/templates/middleware/middleware-ensure-req-body-drained.ts
-var drainBody2 = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx) => {
-  try {
-    return await middlewareCtx.next(request, env);
-  } finally {
-    try {
-      if (request.body !== null && !request.bodyUsed) {
-        const reader = request.body.getReader();
-        while (!(await reader.read()).done) {
-        }
-      }
-    } catch (e) {
-      console.error("Failed to drain the unused request body.", e);
-    }
-  }
-}, "drainBody");
-var middleware_ensure_req_body_drained_default2 = drainBody2;
-
-// C:/Users/id654/AppData/Roaming/npm/node_modules/wrangler/templates/middleware/middleware-miniflare3-json-error.ts
-function reduceError2(e) {
-  return {
-    name: e?.name,
-    message: e?.message ?? String(e),
-    stack: e?.stack,
-    cause: e?.cause === void 0 ? void 0 : reduceError2(e.cause)
-  };
-}
-__name(reduceError2, "reduceError");
-var jsonError2 = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx) => {
-  try {
-    return await middlewareCtx.next(request, env);
-  } catch (e) {
-    const error = reduceError2(e);
-    return Response.json(error, {
-      status: 500,
-      headers: { "MF-Experimental-Error-Stack": "true" }
-    });
-  }
-}, "jsonError");
-var middleware_miniflare3_json_error_default2 = jsonError2;
-
-// .wrangler/tmp/bundle-bK46pA/middleware-insertion-facade.js
-var __INTERNAL_WRANGLER_MIDDLEWARE__2 = [
-  middleware_ensure_req_body_drained_default2,
-  middleware_miniflare3_json_error_default2
-];
-var middleware_insertion_facade_default2 = middleware_loader_entry_default;
-
-// C:/Users/id654/AppData/Roaming/npm/node_modules/wrangler/templates/middleware/common.ts
-var __facade_middleware__2 = [];
-function __facade_register__2(...args) {
-  __facade_middleware__2.push(...args.flat());
-}
-__name(__facade_register__2, "__facade_register__");
-function __facade_invokeChain__2(request, env, ctx, dispatch, middlewareChain) {
-  const [head, ...tail] = middlewareChain;
-  const middlewareCtx = {
-    dispatch,
-    next(newRequest, newEnv) {
-      return __facade_invokeChain__2(newRequest, newEnv, ctx, dispatch, tail);
-    }
-  };
-  return head(request, env, ctx, middlewareCtx);
-}
-__name(__facade_invokeChain__2, "__facade_invokeChain__");
-function __facade_invoke__2(request, env, ctx, dispatch, finalMiddleware) {
-  return __facade_invokeChain__2(request, env, ctx, dispatch, [
-    ...__facade_middleware__2,
-    finalMiddleware
-  ]);
-}
-__name(__facade_invoke__2, "__facade_invoke__");
-
-// .wrangler/tmp/bundle-bK46pA/middleware-loader.entry.ts
-var __Facade_ScheduledController__2 = class ___Facade_ScheduledController__2 {
-  constructor(scheduledTime, cron, noRetry) {
-    this.scheduledTime = scheduledTime;
-    this.cron = cron;
-    this.#noRetry = noRetry;
-  }
-  static {
-    __name(this, "__Facade_ScheduledController__");
-  }
-  #noRetry;
-  noRetry() {
-    if (!(this instanceof ___Facade_ScheduledController__2)) {
-      throw new TypeError("Illegal invocation");
-    }
-    this.#noRetry();
-  }
-};
-function wrapExportedHandler2(worker) {
-  if (__INTERNAL_WRANGLER_MIDDLEWARE__2 === void 0 || __INTERNAL_WRANGLER_MIDDLEWARE__2.length === 0) {
-    return worker;
-  }
-  for (const middleware of __INTERNAL_WRANGLER_MIDDLEWARE__2) {
-    __facade_register__2(middleware);
-  }
-  const fetchDispatcher = /* @__PURE__ */ __name(function(request, env, ctx) {
-    if (worker.fetch === void 0) {
-      throw new Error("Handler does not export a fetch() function.");
-    }
-    return worker.fetch(request, env, ctx);
-  }, "fetchDispatcher");
-  return {
-    ...worker,
-    fetch(request, env, ctx) {
-      const dispatcher = /* @__PURE__ */ __name(function(type, init) {
-        if (type === "scheduled" && worker.scheduled !== void 0) {
-          const controller = new __Facade_ScheduledController__2(
-            Date.now(),
-            init.cron ?? "",
-            () => {
-            }
-          );
-          return worker.scheduled(controller, env, ctx);
-        }
-      }, "dispatcher");
-      return __facade_invoke__2(request, env, ctx, dispatcher, fetchDispatcher);
-    }
-  };
-}
-__name(wrapExportedHandler2, "wrapExportedHandler");
-function wrapWorkerEntrypoint2(klass) {
-  if (__INTERNAL_WRANGLER_MIDDLEWARE__2 === void 0 || __INTERNAL_WRANGLER_MIDDLEWARE__2.length === 0) {
-    return klass;
-  }
-  for (const middleware of __INTERNAL_WRANGLER_MIDDLEWARE__2) {
-    __facade_register__2(middleware);
-  }
-  return class extends klass {
-    #fetchDispatcher = /* @__PURE__ */ __name((request, env, ctx) => {
-      this.env = env;
-      this.ctx = ctx;
-      if (super.fetch === void 0) {
-        throw new Error("Entrypoint class does not define a fetch() function.");
-      }
-      return super.fetch(request);
-    }, "#fetchDispatcher");
-    #dispatcher = /* @__PURE__ */ __name((type, init) => {
-      if (type === "scheduled" && super.scheduled !== void 0) {
-        const controller = new __Facade_ScheduledController__2(
-          Date.now(),
-          init.cron ?? "",
-          () => {
-          }
-        );
-        return super.scheduled(controller);
-      }
-    }, "#dispatcher");
-    fetch(request) {
-      return __facade_invoke__2(
-        request,
-        this.env,
-        this.ctx,
-        this.#dispatcher,
-        this.#fetchDispatcher
-      );
-    }
-  };
-}
-__name(wrapWorkerEntrypoint2, "wrapWorkerEntrypoint");
-var WRAPPED_ENTRY2;
-if (typeof middleware_insertion_facade_default2 === "object") {
-  WRAPPED_ENTRY2 = wrapExportedHandler2(middleware_insertion_facade_default2);
-} else if (typeof middleware_insertion_facade_default2 === "function") {
-  WRAPPED_ENTRY2 = wrapWorkerEntrypoint2(middleware_insertion_facade_default2);
-}
-var middleware_loader_entry_default2 = WRAPPED_ENTRY2;
 export {
-  __INTERNAL_WRANGLER_MIDDLEWARE__2 as __INTERNAL_WRANGLER_MIDDLEWARE__,
-  middleware_loader_entry_default2 as default
+  __INTERNAL_WRANGLER_MIDDLEWARE__,
+  middleware_loader_entry_default as default
 };
-//# sourceMappingURL=functionsWorker-0.8782016881571232.js.map
+//# sourceMappingURL=functionsWorker-0.5619429784935603.mjs.map

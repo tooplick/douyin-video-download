@@ -1,5 +1,6 @@
 // 解析抖音链接，返回精简的视频/图集数据
-const API_BASE = 'https://api.douyin.wtf';
+// 直接调用本地模块，不依赖外部 API
+import { getAwemeId, fetchOneVideo } from '../lib/douyin.js';
 
 // 画质标签映射
 const QUALITY_LABELS = {
@@ -30,7 +31,6 @@ function extractVideoQualities(bitRateList) {
                 item.play_addr.height,
                 item.FPS
             );
-            // 去重：同标签只保留第一个（通常码率更高的）
             if (seen.has(label)) return null;
             seen.add(label);
 
@@ -56,7 +56,7 @@ function formatCount(n) {
 }
 
 export async function onRequestGet(context) {
-    const { request } = context;
+    const { request, env } = context;
     const url = new URL(request.url);
     const targetUrl = url.searchParams.get('url');
 
@@ -67,37 +67,35 @@ export async function onRequestGet(context) {
         );
     }
 
+    // 从分享文本中提取 URL（用户可能粘贴了完整的分享文案）
+    const urlMatch = targetUrl.match(/https?:\/\/[^\s]+/);
+    const cleanUrl = urlMatch ? urlMatch[0] : targetUrl;
+
+    const cookie = env.DOUYIN_COOKIE;
+    if (!cookie) {
+        return Response.json(
+            { code: 500, message: '服务器未配置 DOUYIN_COOKIE' },
+            { status: 500 }
+        );
+    }
+
     try {
-        const apiUrl = `${API_BASE}/api/hybrid/video_data?url=${encodeURIComponent(targetUrl)}`;
-        const resp = await fetch(apiUrl, {
-            headers: {
-                'User-Agent':
-                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            },
-        });
+        // 1. 提取 aweme_id
+        const awemeId = await getAwemeId(cleanUrl);
 
-        if (!resp.ok) {
+        // 2. 直接调用抖音 API（本地模块，不走外部 API）
+        const json = await fetchOneVideo(awemeId, cookie);
+        const detail = json.aweme_detail;
+
+        if (!detail) {
             return Response.json(
-                { code: resp.status, message: 'API 请求失败' },
-                { status: 502 }
-            );
-        }
-
-        const json = await resp.json();
-
-        if (json.code !== 200 || !json.data) {
-            return Response.json(
-                { code: 404, message: '无法解析该链接，请检查链接是否正确' },
+                { code: 404, message: '无法解析该链接，视频可能已删除' },
                 { status: 404 }
             );
         }
 
-        const detail = json.data.aweme_detail || json.data;
-
-        // 判断类型：视频 or 图集
-        const isImagePost =
-            detail.images && detail.images.length > 0;
-
+        // 3. 构建响应
+        const isImagePost = detail.images && detail.images.length > 0;
         const author = detail.author || {};
         const stats = detail.statistics || {};
         const music = detail.music || {};
@@ -110,11 +108,10 @@ export async function onRequestGet(context) {
                 title: detail.preview_title || detail.desc || '无标题',
                 desc: detail.desc || '',
                 createTime: detail.create_time,
-                duration: detail.duration, // 毫秒
+                duration: detail.duration,
                 author: {
                     nickname: author.nickname || '',
-                    avatar:
-                        author.avatar_thumb?.url_list?.[0] || '',
+                    avatar: author.avatar_thumb?.url_list?.[0] || '',
                     uid: author.uid,
                     secUid: author.sec_uid,
                 },
@@ -137,7 +134,6 @@ export async function onRequestGet(context) {
         };
 
         if (isImagePost) {
-            // 图集模式
             result.data.images = detail.images.map((img) => ({
                 url:
                     img.url_list?.[img.url_list.length - 1] ||
@@ -147,12 +143,8 @@ export async function onRequestGet(context) {
                 height: img.height,
             }));
         } else {
-            // 视频模式 — 提取多画质
-            result.data.qualities = extractVideoQualities(
-                detail.video?.bit_rate
-            );
+            result.data.qualities = extractVideoQualities(detail.video?.bit_rate);
 
-            // 如果 bit_rate 为空，尝试从 play_addr 获取默认画质
             if (result.data.qualities.length === 0 && detail.video?.play_addr) {
                 result.data.qualities = [
                     {
@@ -178,7 +170,7 @@ export async function onRequestGet(context) {
         });
     } catch (err) {
         return Response.json(
-            { code: 500, message: '服务器内部错误: ' + err.message },
+            { code: 500, message: '解析失败: ' + err.message },
             { status: 500 }
         );
     }

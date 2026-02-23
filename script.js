@@ -90,6 +90,12 @@ function renderVideoResult(data) {
 
     // 设置视频源（默认第一个画质）
     updateVideoSource(0);
+
+    // 设置浏览器媒体卡片信息
+    setMediaSession(data);
+
+    // 更新页面标题
+    document.title = `${data.title} - 抖音视频下载`;
 }
 
 // 渲染画质列表

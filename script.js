@@ -56,6 +56,41 @@ async function parseVideo() {
     }
 }
 
+// 设置浏览器媒体会话信息（媒体卡片/画中画显示）
+function setMediaSession(data) {
+    if (!('mediaSession' in navigator)) return;
+
+    const artwork = [];
+    if (data.cover) {
+        artwork.push({ src: data.cover, sizes: '512x512', type: 'image/jpeg' });
+    }
+    if (data.author?.avatar) {
+        artwork.push({ src: data.author.avatar, sizes: '96x96', type: 'image/jpeg' });
+    }
+
+    navigator.mediaSession.metadata = new MediaMetadata({
+        title: data.title || '抖音视频',
+        artist: data.author?.nickname || '',
+        album: '抖音',
+        artwork,
+    });
+
+    const video = document.getElementById('videoPlayer');
+
+    navigator.mediaSession.setActionHandler('play', () => {
+        video.play();
+    });
+    navigator.mediaSession.setActionHandler('pause', () => {
+        video.pause();
+    });
+    navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+        video.currentTime = Math.max(0, video.currentTime - (details.seekOffset || 10));
+    });
+    navigator.mediaSession.setActionHandler('seekforward', (details) => {
+        video.currentTime = Math.min(video.duration, video.currentTime + (details.seekOffset || 10));
+    });
+}
+
 // 渲染视频结果
 function renderVideoResult(data) {
     document.getElementById('videoResult').style.display = 'block';
